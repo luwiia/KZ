@@ -1,0 +1,12 @@
+{
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/**",
+        "/usr/include/opencv4"
+    ],
+    "C_Cpp.intelliSenseEngine": "Default",
+    "C_Cpp.errorSquiggles": "enabled",
+    "files.associations": {
+        "*.cpp": "cpp",
+        "opencv.hpp": "c"
+    }
+}
