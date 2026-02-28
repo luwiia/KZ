@@ -1,0 +1,61 @@
+#include <opencv2/opencv.hpp>
+#include <vector>
+#include <string>
+#include <iostream>
+
+struct ColorRange {
+    std::string name;
+    cv::Scalar lower1;
+    cv::Scalar upper1;
+    cv::Scalar lower2 = cv::Scalar(0,0,0); // Для цветов с разрывом (красный)
+    cv::Scalar upper2 = cv::Scalar(0,0,0);
+};
+
+int main() {
+    cv::Mat img = cv::imread("test_image.jpg");
+    if (img.empty()) {
+        std::cerr << "Ошибка: Картинка не найдена!" << std::endl;
+        return -1;
+    }
+
+    cv::Mat hsv, blur;
+    // Размытие помогает убрать мелкий цветовой шум перед сегментацией
+    cv::GaussianBlur(img, blur, cv::Size(5, 5), 0);
+    cv::cvtColor(blur, hsv, cv::COLOR_BGR2HSV);
+
+    std::vector<ColorRange> colors = {
+        {"Blue",  cv::Scalar(100, 100, 50), cv::Scalar(130, 255, 255)},
+        {"Green", cv::Scalar(35, 50, 50),   cv::Scalar(85, 255, 255)},
+        // Красный: объединяем начало и конец диапазона Hue
+        {"Red",   cv::Scalar(0, 120, 70),   cv::Scalar(10, 255, 255), 
+                  cv::Scalar(170, 120, 70), cv::Scalar(180, 255, 255)}
+    };
+
+    for (const auto& c : colors) {
+        cv::Mat mask, mask1, mask2, res;
+        
+        cv::inRange(hsv, c.lower1, c.upper1, mask1);
+        if (c.upper2[0] > 0) { // Если задан второй диапазон
+            cv::inRange(hsv, c.lower2, c.upper2, mask2);
+            cv::addWeighted(mask1, 1.0, mask2, 1.0, 0.0, mask);
+        } else {
+            mask = mask1;
+        }
+
+        // Убираем шумы (Морфология)
+        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+        cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);  // удаляет мелкий мусор
+        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel); // закрывает дырки
+
+        cv::bitwise_and(img, img, res, mask);
+        
+        cv::imshow("Original", img);
+        cv::imshow("Mask: " + c.name, mask);
+        cv::imshow("Result: " + c.name, res);
+        
+        std::cout << "Отображаем: " << c.name << ". Нажми любую клавишу..." << std::endl;
+        cv::waitKey(0);
+    }
+
+    return 0;
+}
