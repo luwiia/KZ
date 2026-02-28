@@ -1,0 +1,33 @@
+#include <opencv2/opencv.hpp>
+#include <vector>
+#include <string>
+
+struct ColorRange {
+    std::string name;
+    cv::Scalar lower;
+    cv::Scalar upper;
+};
+
+int main() {
+    cv::Mat img = cv::imread("test_image.jpg");
+    cv::Mat hsv;
+    cv::cvtColor(img, hsv, cv::COLOR_BGR2HSV);
+
+    // диапазоны цветов
+    std::vector<ColorRange> colors = {
+        {"Blue",  cv::Scalar(100, 150, 50), cv::Scalar(140, 255, 255)},
+        {"Green", cv::Scalar(35, 100, 50),  cv::Scalar(85, 255, 255)},
+        {"Red",   cv::Scalar(0, 150, 50),   cv::Scalar(10, 255, 255)} // Красный сложнее, но для теста пойдет
+    };
+
+    for (const auto& c : colors) {
+        cv::Mat mask, res;
+        cv::inRange(hsv, c.lower, c.upper, mask);
+        cv::bitwise_and(img, img, res, mask);
+        
+        cv::imshow("Detection: " + c.name, res);
+        cv::waitKey(0);
+    }
+
+    return 0;
+}
