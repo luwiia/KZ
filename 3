@@ -1,0 +1,66 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <algorithm>
+
+int main() {
+    cv::Mat img = cv::imread("test_image.jpg");
+    if (img.empty()) {
+        std::cout << "Ошибка: изображение не найдено!" << std::endl;
+        return -1;
+    }
+
+    cv::Mat gray_cv, hsv_cv;
+    cv::Mat gray_custom(img.rows, img.cols, CV_8UC1);
+    cv::Mat hsv_custom(img.rows, img.cols, CV_8UC3);
+
+    cv::cvtColor(img, gray_cv, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(img, hsv_cv, cv::COLOR_BGR2HSV);
+
+    for (int y = 0; y < img.rows; y++) {
+        for (int x = 0; x < img.cols; x++) {
+            cv::Vec3b bgr = img.at<cv::Vec3b>(y, x);
+            float b = bgr[0] / 255.0f;
+            float g = bgr[1] / 255.0f;
+            float r = bgr[2] / 255.0f;
+
+            // Формула: 0.299*R + 0.587*G + 0.114*B
+            uchar gray_val = cv::saturate_cast<uchar>(0.299f * bgr[2] + 0.587f * bgr[1] + 0.114f * bgr[0]);
+            gray_custom.at<uchar>(y, x) = gray_val;
+
+            // --- Б: Перевод в HSV ---
+            float max_v = std::max({r, g, b});
+            float min_v = std::min({r, g, b});
+            float diff = max_v - min_v;
+            
+            float h = 0, s = 0, v = max_v;
+
+            // Вычисление Saturation (Насыщенность)
+            if (max_v > 0) s = diff / max_v;
+
+            // Вычисление Hue (Цветовой тон)
+            if (diff != 0) {
+                if (max_v == r) h = 60 * (fmod(((g - b) / diff), 6));
+                else if (max_v == g) h = 60 * (((b - r) / diff) + 2);
+                else if (max_v == b) h = 60 * (((r - g) / diff) + 4);
+            }
+            if (h < 0) h += 360;
+
+            // Приведение к формату OpenCV (H: 0-179, S: 0-255, V: 0-255)
+            hsv_custom.at<cv::Vec3b>(y, x) = cv::Vec3b(
+                cv::saturate_cast<uchar>(h / 2.0f), 
+                cv::saturate_cast<uchar>(s * 255.0f), 
+                cv::saturate_cast<uchar>(v * 255.0f)
+            );
+        }
+    }
+
+    cv::imshow("Original", img);
+    cv::imshow("Gray OpenCV", gray_cv);
+    cv::imshow("Gray Custom", gray_custom);
+    cv::imshow("HSV OpenCV", hsv_cv);
+    cv::imshow("HSV Custom", hsv_custom);
+
+    std::cout << "Нажмите любую клавишу для выхода..." << std::endl;
+    cv::waitKey(0);
+    return 0;
+}
