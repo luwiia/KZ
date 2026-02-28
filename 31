@@ -1,0 +1,93 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <algorithm>
+#include <cmath>
+
+int main() {
+    // 1. Загрузка изображения
+    cv::Mat img = cv::imread("test_image.jpg");
+    if (img.empty()) {
+        std::cout << "Ошибка: изображение не найдено!" << std::endl;
+        return -1;
+    }
+
+    // Подготовка матриц
+    cv::Mat gray_cv, hsv_cv;
+    cv::Mat gray_custom(img.rows, img.cols, CV_8UC1);
+    cv::Mat hsv_custom(img.rows, img.cols, CV_8UC3);
+
+    // Эталонные методы OpenCV
+    cv::cvtColor(img, gray_cv, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(img, hsv_cv, cv::COLOR_BGR2HSV);
+
+    // 2. Попиксельный обход (Ваша реализация)
+    for (int y = 0; y < img.rows; y++) {
+        for (int x = 0; x < img.cols; x++) {
+            cv::Vec3b bgr = img.at<cv::Vec3b>(y, x);
+            float b = bgr[0] / 255.0f;
+            float g = bgr[1] / 255.0f;
+            float r = bgr[2] / 255.0f;
+
+            // --- Кастомный Grayscale ---
+            uchar gray_val = cv::saturate_cast<uchar>(0.299f * bgr[2] + 0.587f * bgr[1] + 0.114f * bgr[0]);
+            gray_custom.at<uchar>(y, x) = gray_val;
+
+            // --- Кастомный HSV ---
+            float max_v = std::max({r, g, b});
+            float min_v = std::min({r, g, b});
+            float diff = max_v - min_v;
+            
+            float h = 0, s = 0, v = max_v;
+
+            if (max_v > 0) s = diff / max_v;
+
+            if (diff != 0) {
+                if (max_v == r) h = 60 * (fmod(((g - b) / diff), 6));
+                else if (max_v == g) h = 60 * (((b - r) / diff) + 2);
+                else if (max_v == b) h = 60 * (((r - g) / diff) + 4);
+            }
+            if (h < 0) h += 360;
+
+            hsv_custom.at<cv::Vec3b>(y, x) = cv::Vec3b(
+                cv::saturate_cast<uchar>(h / 2.0f), 
+                cv::saturate_cast<uchar>(s * 255.0f), 
+                cv::saturate_cast<uchar>(v * 255.0f)
+            );
+        }
+    }
+
+    // --- АНАЛИЗ (3 задание) ---
+    cv::Mat diff_gray, diff_hsv;
+    // Находим абсолютную разницу между матрицами
+    cv::absdiff(gray_cv, gray_custom, diff_gray);
+    cv::absdiff(hsv_cv, hsv_custom, diff_hsv);
+
+    // Считаем среднее отклонение
+    cv::Scalar mean_gray = cv::mean(diff_gray);
+    cv::Scalar mean_hsv = cv::mean(diff_hsv);
+
+    std::cout << "=== РЕЗУЛЬТАТЫ СРАВНЕНИЯ ===" << std::endl;
+    std::cout << "Средняя разница в Grayscale: " << mean_gray[0] << " единиц яркости" << std::endl;
+    std::cout << "Средняя разница в HSV (H, S, V): " 
+              << mean_hsv[0] << ", " << mean_hsv[1] << ", " << mean_hsv[2] << std::endl;
+    
+    if (mean_gray[0] < 1.0 && mean_hsv[2] < 1.0) {
+        std::cout << "Вывод: Реализации практически идентичны." << std::endl;
+    } else {
+        std::cout << "Вывод: Есть небольшие расхождения из-за точности float/int." << std::endl;
+    }
+    // ---------------------------
+
+    // Вывод всех окон
+    cv::imshow("Original", img);
+    cv::imshow("Gray OpenCV", gray_cv);
+    cv::imshow("Gray Custom", gray_custom);
+    cv::imshow("HSV OpenCV", hsv_cv);
+    cv::imshow("HSV Custom", hsv_custom);
+    
+    // Показываем разницу (умножаем на 20, чтобы визуально заметить даже минимальные отличия)
+    cv::imshow("Difference Visualized (x20)", diff_hsv * 20);
+
+    cv::waitKey(0);
+    return 0;
+}
